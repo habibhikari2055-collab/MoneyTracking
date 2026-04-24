@@ -1,1 +1,151 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dompet Habib - UI Version</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-50 min-h-screen font-sans">
+    <div class="max-w-md mx-auto bg-white min-h-screen shadow-2xl overflow-hidden relative">
+        
+        <div class="bg-gradient-to-br from-indigo-600 to-violet-700 p-8 text-white rounded-b-[3rem] shadow-lg">
+            <h1 class="text-2xl font-bold tracking-tight">Manajemen Uang</h1>
+            <p class="text-indigo-100 text-xs opacity-80 mt-1" id="tanggal"></p>
+            
+            <div class="mt-6">
+                <p class="text-indigo-200 text-sm font-medium">Total Saldo Kamu</p>
+                <h2 id="display-saldo" class="text-4xl font-extrabold mt-1 tracking-tighter">Rp 0</h2>
+            </div>
+        </div>
 
+        <div class="p-6 -mt-8">
+            <div class="bg-white p-5 rounded-3xl shadow-xl border border-slate-100 space-y-4">
+                <input type="text" id="input-ket" placeholder="Keterangan (misal: Beli Bakso)" 
+                    class="w-full px-4 py-3 rounded-2xl bg-slate-50 border-none ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                
+                <input type="number" id="input-nom" placeholder="Nominal Rp" 
+                    class="w-full px-4 py-3 rounded-2xl bg-slate-50 border-none ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                
+                <div class="flex gap-2">
+                    <select id="input-tipe" class="flex-1 p-3 rounded-2xl bg-slate-50 border-none ring-1 ring-slate-200 font-semibold text-slate-600 outline-none">
+                        <option value="masuk">Pemasukan (+)</option>
+                        <option value="keluar">Pengeluaran (-)</option>
+                    </select>
+                    <button onclick="tambahData()" class="bg-indigo-600 text-white px-8 rounded-2xl font-bold hover:bg-indigo-700 active:scale-95 transition-all">
+                        Simpan
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="px-6 mb-6">
+            <div class="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm">
+                <canvas id="chartUang" height="150"></canvas>
+            </div>
+        </div>
+
+        <div class="px-6 pb-20">
+            <h3 class="font-bold text-slate-800 mb-4 ml-2 flex justify-between items-center">
+                Riwayat Transaksi
+                <span id="count" class="text-xs bg-slate-100 px-2 py-1 rounded-full text-slate-500">0 data</span>
+            </h3>
+            <ul id="kontainer-list" class="space-y-3">
+                </ul>
+        </div>
+    </div>
+
+    <script>
+        let dataTransaksi = JSON.parse(localStorage.getItem('my_money')) || [];
+        let myChart;
+
+        function updateUI() {
+            const listUl = document.getElementById('kontainer-list');
+            listUl.innerHTML = '';
+            let total = 0, masuk = 0, keluar = 0;
+
+            dataTransaksi.forEach((item, index) => {
+                if(item.tipe === 'masuk') { total += item.nom; masuk += item.nom; }
+                else { total -= item.nom; keluar += item.nom; }
+
+                const li = document.createElement('li');
+                li.className = "flex justify-between items-center p-4 bg-white rounded-2xl border border-slate-100 shadow-sm animate-fade-in";
+                li.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full flex items-center justify-center ${item.tipe === 'masuk' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}">
+                            <i class="fas ${item.tipe === 'masuk' ? 'fa-plus' : 'fa-minus'} text-xs"></i>
+                        </div>
+                        <div>
+                            <p class="font-bold text-slate-700 text-sm">${item.ket}</p>
+                            <p class="text-[10px] text-slate-400 uppercase font-medium">${item.tgl}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <p class="font-bold text-sm ${item.tipe === 'masuk' ? 'text-green-500' : 'text-red-500'}">
+                            Rp ${item.nom.toLocaleString('id-ID')}
+                        </p>
+                        <button onclick="hapusData(${index})" class="text-slate-300 hover:text-red-500 transition-colors">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+                `;
+                listUl.appendChild(li);
+            });
+
+            document.getElementById('display-saldo').innerText = `Rp ${total.toLocaleString('id-ID')}`;
+            document.getElementById('count').innerText = `${dataTransaksi.length} data`;
+            updateChart(masuk, keluar);
+            localStorage.setItem('my_money', JSON.stringify(dataTransaksi));
+        }
+
+        function tambahData() {
+            const ket = document.getElementById('input-ket').value;
+            const nom = parseInt(document.getElementById('input-nom').value);
+            const tipe = document.getElementById('input-tipe').value;
+
+            if(!ket || !nom) return alert("Isi data dulu ya!");
+
+            dataTransaksi.unshift({
+                ket: ket,
+                nom: nom,
+                tipe: tipe,
+                tgl: new Date().toLocaleDateString('id-ID')
+            });
+
+            document.getElementById('input-ket').value = '';
+            document.getElementById('input-nom').value = '';
+            updateUI();
+        }
+
+        function hapusData(index) {
+            if(confirm('Hapus catatan ini?')) {
+                dataTransaksi.splice(index, 1);
+                updateUI();
+            }
+        }
+
+        function updateChart(masuk, keluar) {
+            const ctx = document.getElementById('chartUang').getContext('2d');
+            if(myChart) myChart.destroy();
+            myChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Masuk', 'Keluar'],
+                    datasets: [{
+                        data: [masuk, keluar],
+                        backgroundColor: ['#4f46e5', '#ef4444'],
+                        borderWidth: 0,
+                        cutout: '70%'
+                    }]
+                },
+                options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, usePointStyle: true } } } }
+            });
+        }
+
+        document.getElementById('tanggal').innerText = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' });
+        updateUI();
+    </script>
+</body>
+</html>
